@@ -37,6 +37,13 @@ Apply database migrations:
 alembic upgrade head
 ```
 
+Add a test phone number to the inbound allowlist:
+
+```bash
+docker compose exec postgres psql -U bridge -d bridge_a2p \
+  -c "insert into allowed_senders (id, phone_number, label) values (gen_random_uuid(), '+15551230000', 'Local test sender');"
+```
+
 Run the API:
 
 ```bash
@@ -66,6 +73,10 @@ Twilio sends inbound SMS webhooks as form-encoded fields. The app currently stor
 - `Body`
 - `NumMedia`
 - the full raw Twilio payload
+
+Only senders listed in `allowed_senders` are stored. Unknown senders receive an HTTP `403`
+response with `Sender is not allowed`, which keeps them out of the local database while making
+the rejection visible in Twilio's webhook request logs.
 
 For local Twilio testing, expose the local API with a tunnel such as ngrok and configure your
 Twilio phone number's messaging webhook to:
