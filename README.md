@@ -92,6 +92,15 @@ number in `sending_list_recipients`, sets `active` to `false` when present, retu
 and does not store an inbound message. Twilio should own the user-facing opt-out confirmation
 message through its Messaging Service opt-out settings.
 
+Opt-in messages are also processed before the admin-number check. If Twilio sends `OptOutType=START`,
+or if any sender texts only the word `start` matched case-insensitively, the app looks up their
+number in `sending_list_recipients` and sets `active` to `true` when present. If the sender is not
+already in the sending list, the app responds with:
+
+```text
+Please see a BRIDGE board member for joining this service
+```
+
 Outbound sending should only use recipients where `sending_list_recipients.active = true`.
 The sending list service exposes helpers for checking a single number and loading active
 recipients so the app avoids sending to locally opted-out numbers before Twilio rejects them.

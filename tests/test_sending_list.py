@@ -10,10 +10,13 @@ from app.services.sending_list import (
     empty_twiml,
     get_active_recipients,
     is_active_recipient,
+    is_start_message,
+    is_start_opt_in,
     is_stop_message,
     is_stop_opt_out,
     message_twiml,
     normalize_us_phone_number,
+    opt_in_sender,
     opt_out_sender,
     parse_add_recipient_command,
 )
@@ -54,6 +57,20 @@ def test_non_stop_messages_are_not_opt_out_commands() -> None:
     assert not is_stop_message("")
 
 
+def test_start_messages_are_opt_in_commands() -> None:
+    assert is_start_message("START")
+    assert is_start_message("start")
+    assert is_start_message("Start")
+    assert is_start_message("sTaRt")
+    assert is_start_message(" START ")
+
+
+def test_non_start_messages_are_not_opt_in_commands() -> None:
+    assert not is_start_message("hello")
+    assert not is_start_message("start please")
+    assert not is_start_message("")
+
+
 def test_twilio_opt_out_type_is_an_opt_out_command() -> None:
     assert is_stop_opt_out({"OptOutType": "STOP", "Body": "anything"})
     assert is_stop_opt_out({"OptOutType": "stop", "Body": "anything"})
@@ -61,6 +78,15 @@ def test_twilio_opt_out_type_is_an_opt_out_command() -> None:
 
 def test_body_stop_is_an_opt_out_command_without_twilio_opt_out_type() -> None:
     assert is_stop_opt_out({"Body": "Stop"})
+
+
+def test_twilio_opt_out_type_start_is_an_opt_in_command() -> None:
+    assert is_start_opt_in({"OptOutType": "START", "Body": "anything"})
+    assert is_start_opt_in({"OptOutType": "start", "Body": "anything"})
+
+
+def test_body_start_is_an_opt_in_command_without_twilio_opt_out_type() -> None:
+    assert is_start_opt_in({"Body": "Start"})
 
 
 def test_empty_twiml_does_not_send_a_duplicate_confirmation() -> None:
@@ -106,6 +132,27 @@ def test_opt_out_sender_rolls_back_and_returns_false_on_database_error() -> None
     session = FailingSession()
 
     assert not opt_out_sender(session, "+15551230000")  # type: ignore[arg-type]
+    assert session.rollback_called
+
+
+def test_opt_in_sender_reactivates_existing_recipient() -> None:
+    with build_test_session() as session:
+        session.add(SendingListRecipient(phone_number="+15551230000", active=False))
+        session.commit()
+
+        assert opt_in_sender(session, "+15551230000")
+        assert is_active_recipient(session, "+15551230000")
+
+
+def test_opt_in_sender_returns_false_for_missing_recipient() -> None:
+    with build_test_session() as session:
+        assert not opt_in_sender(session, "+15551230000")
+
+
+def test_opt_in_sender_rolls_back_and_returns_false_on_database_error() -> None:
+    session = FailingSession()
+
+    assert not opt_in_sender(session, "+15551230000")  # type: ignore[arg-type]
     assert session.rollback_called
 
 

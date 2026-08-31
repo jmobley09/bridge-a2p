@@ -8,11 +8,14 @@ from app.services.admin_numbers import is_admin_number
 from app.services.inbound_messages import save_inbound_message
 from app.services.sending_list import (
     AddRecipientResult,
+    JOIN_INSTRUCTIONS_MESSAGE,
     WELCOME_MESSAGE,
     add_recipient,
     empty_twiml,
+    is_start_opt_in,
     is_stop_opt_out,
     message_twiml,
+    opt_in_sender,
     opt_out_sender,
     parse_add_recipient_command,
 )
@@ -55,6 +58,14 @@ async def receive_inbound_sms(
         opt_out_sender(session, payload["From"])
         return Response(content=empty_twiml(), media_type="application/xml")
 
+    if is_start_opt_in(payload):
+        if opt_in_sender(session, payload["From"]):
+            return Response(content=empty_twiml(), media_type="application/xml")
+        return Response(
+            content=message_twiml(JOIN_INSTRUCTIONS_MESSAGE),
+            media_type="application/xml",
+        )
+
     if not is_admin_number(session, payload["From"]):
         return Response(
             content="Sender is not an admin number",
@@ -68,10 +79,7 @@ async def receive_inbound_sms(
         if result == AddRecipientResult.ALREADY_ACTIVE:
             admin_message = "user already has an active account"
         elif result == AddRecipientResult.OPTED_OUT:
-            admin_message = (
-                f"user exists. please try again with 'activate: {recipient_phone_number}' "
-                "to reactivate."
-            )
+            admin_message = "user exists. have user reply START to re-enable."
         elif result == AddRecipientResult.ERROR:
             admin_message = f"{recipient_phone_number} could not be added. Check application logs."
         else:

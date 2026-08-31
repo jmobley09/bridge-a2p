@@ -14,6 +14,7 @@ EMPTY_TWIML = "<Response></Response>"
 ADD_RECIPIENT_PATTERN = re.compile(r"^\s*Add:\s*(?P<phone_number>.+?)\s*$", re.IGNORECASE)
 PHONE_ALLOWED_CHARS_PATTERN = re.compile(r"^[\d\s().+-]+$")
 PHONE_DIGITS_PATTERN = re.compile(r"\D+")
+JOIN_INSTRUCTIONS_MESSAGE = "Please see a BRIDGE board member for joining this service"
 WELCOME_MESSAGE = "You have been added to the BRIDGE SMS service. Reply STOP to opt out."
 
 
@@ -32,8 +33,18 @@ def is_stop_message(body: str) -> bool:
     return body.strip().casefold() == "stop"
 
 
+def is_start_message(body: str) -> bool:
+    return body.strip().casefold() == "start"
+
+
 def is_stop_opt_out(payload: dict[str, str]) -> bool:
     return payload.get("OptOutType", "").casefold() == "stop" or is_stop_message(
+        payload.get("Body", "")
+    )
+
+
+def is_start_opt_in(payload: dict[str, str]) -> bool:
+    return payload.get("OptOutType", "").casefold() == "start" or is_start_message(
         payload.get("Body", "")
     )
 
@@ -124,4 +135,25 @@ def opt_out_sender(session: Session, phone_number: str) -> bool:
     except SQLAlchemyError as error:
         session.rollback()
         logger.warning("Unable to update SMS opt-out for %s: %s", normalized_phone_number, error)
+        return False
+
+
+def opt_in_sender(session: Session, phone_number: str) -> bool:
+    normalized_phone_number = phone_number.strip()
+    try:
+        recipient = session.exec(
+            select(SendingListRecipient).where(
+                SendingListRecipient.phone_number == normalized_phone_number
+            )
+        ).first()
+        if recipient is None:
+            return False
+
+        recipient.active = True
+        session.add(recipient)
+        session.commit()
+        return True
+    except SQLAlchemyError as error:
+        session.rollback()
+        logger.warning("Unable to update SMS opt-in for %s: %s", normalized_phone_number, error)
         return False
