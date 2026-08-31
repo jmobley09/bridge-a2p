@@ -78,6 +78,15 @@ Only senders listed in `allowed_senders` are stored. Unknown senders receive an 
 response with `Sender is not allowed`, which keeps them out of the local database while making
 the rejection visible in Twilio's webhook request logs.
 
+Opt-out messages are processed before the allowlist check. If any sender texts only the word
+`stop`, matched case-insensitively, the app looks up their number in `sending_list_recipients`,
+sets `active` to `false` when present, returns confirmation TwiML, and does not store an inbound
+message. The sender receives:
+
+```text
+You have been removed from this SMS service.
+```
+
 For local Twilio testing, expose the local API with a tunnel such as ngrok and configure your
 Twilio phone number's messaging webhook to:
 
