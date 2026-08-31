@@ -182,3 +182,41 @@ Apply migrations with:
 ```bash
 alembic upgrade head
 ```
+
+## Azure App Service deployment
+
+GitHub Actions deploys this app to Azure App Service with
+[.github/workflows/deploy-azure-app-service.yml](.github/workflows/deploy-azure-app-service.yml).
+
+The workflow runs on pushes to `main` and `develop`, and can also be started manually from the
+GitHub Actions tab.
+
+Configure these GitHub repository settings:
+
+- Variable: `AZURE_WEBAPP_NAME` = your Azure App Service name
+- Secret: `AZURE_WEBAPP_PUBLISH_PROFILE` = the publish profile XML downloaded from Azure App Service
+
+Configure these Azure App Service application settings:
+
+```env
+DATABASE_URL=postgresql+psycopg://...
+APP_ENV=production
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_API_KEY_SID=SKxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_API_KEY_SECRET=your_twilio_api_key_secret
+TWILIO_AUTH_TOKEN=your_twilio_auth_token
+TWILIO_VALIDATE_SIGNATURE=true
+PUBLIC_WEBHOOK_BASE_URL=https://sms.bridgehsc.org
+```
+
+The Azure startup script runs migrations before starting the app:
+
+```bash
+./startup.sh
+```
+
+After the custom domain is configured, set the Twilio Messaging webhook to:
+
+```text
+https://sms.bridgehsc.org/webhooks/twilio/inbound-sms
+```
