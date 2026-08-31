@@ -6,7 +6,7 @@ from app.core.config import Settings, get_settings
 from app.db.session import get_session
 from app.services.allowed_senders import is_allowed_sender
 from app.services.inbound_messages import save_inbound_message
-from app.services.sending_list import is_stop_message, opt_out_confirmation_twiml, opt_out_sender
+from app.services.sending_list import empty_twiml, is_stop_opt_out, opt_out_sender
 from app.services.twilio_security import is_valid_twilio_signature
 
 router = APIRouter(prefix="/webhooks/twilio", tags=["twilio"])
@@ -41,9 +41,9 @@ async def receive_inbound_sms(
     ):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid Twilio signature")
 
-    if is_stop_message(payload.get("Body", "")):
+    if is_stop_opt_out(payload):
         opt_out_sender(session, payload["From"])
-        return Response(content=opt_out_confirmation_twiml(), media_type="application/xml")
+        return Response(content=empty_twiml(), media_type="application/xml")
 
     if not is_allowed_sender(session, payload["From"]):
         return Response(
@@ -53,4 +53,4 @@ async def receive_inbound_sms(
         )
 
     save_inbound_message(session, payload)
-    return Response(content="<Response></Response>", media_type="application/xml")
+    return Response(content=empty_twiml(), media_type="application/xml")
