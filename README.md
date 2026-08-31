@@ -37,11 +37,19 @@ Apply database migrations:
 alembic upgrade head
 ```
 
-Add a test phone number to the inbound allowlist:
+Add a test phone number to the admin numbers table:
 
 ```bash
 docker compose exec postgres psql -U bridge -d bridge_a2p \
-  -c "insert into allowed_senders (id, phone_number, label) values (gen_random_uuid(), '+15551230000', 'Local test sender');"
+  -c "insert into admin_numbers (id, phone_number, label) values (gen_random_uuid(), '+15551230000', 'Local test admin');"
+```
+
+To send welcome messages when an admin adds a recipient, configure Twilio REST credentials:
+
+```env
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_API_KEY_SID=SKxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_API_KEY_SECRET=your_twilio_api_key_secret
 ```
 
 Run the API:
@@ -74,11 +82,11 @@ Twilio sends inbound SMS webhooks as form-encoded fields. The app currently stor
 - `NumMedia`
 - the full raw Twilio payload
 
-Only senders listed in `allowed_senders` are stored. Unknown senders receive an HTTP `403`
-response with `Sender is not allowed`, which keeps them out of the local database while making
+Only senders listed in `admin_numbers` are stored. Unknown senders receive an HTTP `403`
+response with `Sender is not an admin number`, which keeps them out of the local database while making
 the rejection visible in Twilio's webhook request logs.
 
-Opt-out messages are processed before the allowlist check. If Twilio sends `OptOutType=STOP`,
+Opt-out messages are processed before the admin-number check. If Twilio sends `OptOutType=STOP`,
 or if any sender texts only the word `stop` matched case-insensitively, the app looks up their
 number in `sending_list_recipients`, sets `active` to `false` when present, returns empty TwiML,
 and does not store an inbound message. Twilio should own the user-facing opt-out confirmation
@@ -87,6 +95,26 @@ message through its Messaging Service opt-out settings.
 Outbound sending should only use recipients where `sending_list_recipients.active = true`.
 The sending list service exposes helpers for checking a single number and loading active
 recipients so the app avoids sending to locally opted-out numbers before Twilio rejects them.
+
+Admins can add a new sending-list recipient by texting:
+
+```text
+Add: +15551230000
+```
+
+US numbers may also be sent without a country code, for example `Add: 5551230000`.
+The app normalizes them to E.164 format with a `+1` prefix before storing or sending.
+
+The sender must be listed in `admin_numbers`. When a new active recipient is added, the app replies
+to that admin with a confirmation and sends this welcome message to the recipient:
+
+```text
+You have been added to the BRIDGE SMS service. Reply STOP to opt out.
+```
+
+If the number is already active, the admin receives `user already has an active account`. If the
+number exists but is inactive, the app does not reactivate it or send a welcome message, and the
+admin receives `user exists. please try again with 'activate: <phone number>' to reactivate.`
 
 For local Twilio testing, expose the local API with a tunnel such as ngrok and configure your
 Twilio phone number's messaging webhook to:
@@ -101,8 +129,18 @@ Set `PUBLIC_WEBHOOK_BASE_URL` in `.env` to the same public base URL Twilio uses,
 PUBLIC_WEBHOOK_BASE_URL=https://your-public-url.example
 ```
 
-If `TWILIO_AUTH_TOKEN` is set, requests must include a valid `X-Twilio-Signature` header.
-Leaving it blank is convenient for early local testing but should not be used in production.
+For local testing, keep webhook signature validation disabled while still using Twilio credentials
+for outbound messages:
+
+```env
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=your_twilio_auth_token
+TWILIO_VALIDATE_SIGNATURE=false
+```
+
+In production, set `TWILIO_VALIDATE_SIGNATURE=true`. When enabled, requests must include a valid
+`X-Twilio-Signature` header and `PUBLIC_WEBHOOK_BASE_URL` must exactly match the public URL Twilio
+uses to call the webhook.
 
 ## Migrations
 

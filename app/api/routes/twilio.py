@@ -4,9 +4,19 @@ from sqlmodel import Session
 
 from app.core.config import Settings, get_settings
 from app.db.session import get_session
-from app.services.allowed_senders import is_allowed_sender
+from app.services.admin_numbers import is_admin_number
 from app.services.inbound_messages import save_inbound_message
-from app.services.sending_list import empty_twiml, is_stop_opt_out, opt_out_sender
+from app.services.sending_list import (
+    AddRecipientResult,
+    WELCOME_MESSAGE,
+    add_recipient,
+    empty_twiml,
+    is_stop_opt_out,
+    message_twiml,
+    opt_out_sender,
+    parse_add_recipient_command,
+)
+from app.services.twilio_messages import send_sms
 from app.services.twilio_security import is_valid_twilio_signature
 
 router = APIRouter(prefix="/webhooks/twilio", tags=["twilio"])
@@ -37,7 +47,7 @@ async def receive_inbound_sms(
         url=public_url,
         params=payload,
         signature=request.headers.get("X-Twilio-Signature"),
-        auth_token=settings.twilio_auth_token,
+        auth_token=settings.twilio_auth_token if settings.twilio_validate_signature else None,
     ):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid Twilio signature")
 
@@ -45,12 +55,41 @@ async def receive_inbound_sms(
         opt_out_sender(session, payload["From"])
         return Response(content=empty_twiml(), media_type="application/xml")
 
-    if not is_allowed_sender(session, payload["From"]):
+    if not is_admin_number(session, payload["From"]):
         return Response(
-            content="Sender is not allowed",
+            content="Sender is not an admin number",
             media_type="text/plain",
             status_code=status.HTTP_403_FORBIDDEN,
         )
+
+    recipient_phone_number = parse_add_recipient_command(payload.get("Body", ""))
+    if recipient_phone_number is not None:
+        result = add_recipient(session, recipient_phone_number)
+        if result == AddRecipientResult.ALREADY_ACTIVE:
+            admin_message = "user already has an active account"
+        elif result == AddRecipientResult.OPTED_OUT:
+            admin_message = (
+                f"user exists. please try again with 'activate: {recipient_phone_number}' "
+                "to reactivate."
+            )
+        elif result == AddRecipientResult.ERROR:
+            admin_message = f"{recipient_phone_number} could not be added. Check application logs."
+        else:
+            welcome_sent = send_sms(
+                account_sid=settings.twilio_account_sid,
+                api_key_sid=settings.twilio_api_key_sid,
+                api_key_secret=settings.twilio_api_key_secret,
+                from_number=payload["To"],
+                to_number=recipient_phone_number,
+                body=WELCOME_MESSAGE,
+            )
+            admin_message = (
+                f"Added {recipient_phone_number} and sent the welcome message."
+                if welcome_sent
+                else f"Added {recipient_phone_number}, but the welcome message could not be sent."
+            )
+
+        return Response(content=message_twiml(admin_message), media_type="application/xml")
 
     save_inbound_message(session, payload)
     return Response(content=empty_twiml(), media_type="application/xml")

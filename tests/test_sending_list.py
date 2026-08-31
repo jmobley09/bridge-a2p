@@ -4,13 +4,18 @@ from sqlmodel import Session, SQLModel, create_engine
 
 from app.models.sending_list_recipient import SendingListRecipient
 from app.services.sending_list import (
+    AddRecipientResult,
     EMPTY_TWIML,
+    add_recipient,
     empty_twiml,
     get_active_recipients,
     is_active_recipient,
     is_stop_message,
     is_stop_opt_out,
+    message_twiml,
+    normalize_us_phone_number,
     opt_out_sender,
+    parse_add_recipient_command,
 )
 
 
@@ -63,6 +68,40 @@ def test_empty_twiml_does_not_send_a_duplicate_confirmation() -> None:
     assert "<Message>" not in empty_twiml()
 
 
+def test_message_twiml_escapes_content() -> None:
+    assert message_twiml("Added +15551230000 & sent welcome") == (
+        "<Response><Message>Added +15551230000 &amp; sent welcome</Message></Response>"
+    )
+
+
+def test_parse_add_recipient_command() -> None:
+    assert parse_add_recipient_command("Add: +15551230000") == "+15551230000"
+    assert parse_add_recipient_command("Add: 15551230000") == "+15551230000"
+    assert parse_add_recipient_command("Add: 5551230000") == "+15551230000"
+    assert parse_add_recipient_command("Add: (555) 123-0000") == "+15551230000"
+    assert parse_add_recipient_command(" add: +15551230000 ") == "+15551230000"
+
+
+def test_parse_add_recipient_command_rejects_invalid_body() -> None:
+    assert parse_add_recipient_command("Add:+15551230000") == "+15551230000"
+    assert parse_add_recipient_command("Add: +15551230000 now") is None
+    assert parse_add_recipient_command("hello") is None
+
+
+def test_normalize_us_phone_number() -> None:
+    assert normalize_us_phone_number("+15551230000") == "+15551230000"
+    assert normalize_us_phone_number("15551230000") == "+15551230000"
+    assert normalize_us_phone_number("5551230000") == "+15551230000"
+    assert normalize_us_phone_number("(555) 123-0000") == "+15551230000"
+
+
+def test_normalize_us_phone_number_rejects_invalid_values() -> None:
+    assert normalize_us_phone_number("+25551230000") is None
+    assert normalize_us_phone_number("555123000") is None
+    assert normalize_us_phone_number("55512300000") is None
+    assert normalize_us_phone_number("not a number") is None
+
+
 def test_opt_out_sender_rolls_back_and_returns_false_on_database_error() -> None:
     session = FailingSession()
 
@@ -90,3 +129,39 @@ def test_get_active_recipients_excludes_inactive_numbers() -> None:
         recipients = get_active_recipients(session)
 
         assert [recipient.phone_number for recipient in recipients] == ["+15551230000"]
+
+
+def test_add_recipient_creates_active_recipient() -> None:
+    with build_test_session() as session:
+        result = add_recipient(session, "+15551230000")
+
+        assert result == AddRecipientResult.ADDED
+        assert is_active_recipient(session, "+15551230000")
+
+
+def test_add_recipient_does_not_duplicate_active_recipient() -> None:
+    with build_test_session() as session:
+        session.add(SendingListRecipient(phone_number="+15551230000", active=True))
+        session.commit()
+
+        result = add_recipient(session, "+15551230000")
+
+        assert result == AddRecipientResult.ALREADY_ACTIVE
+
+
+def test_add_recipient_does_not_reactivate_opted_out_recipient() -> None:
+    with build_test_session() as session:
+        session.add(SendingListRecipient(phone_number="+15551230000", active=False))
+        session.commit()
+
+        result = add_recipient(session, "+15551230000")
+
+        assert result == AddRecipientResult.OPTED_OUT
+        assert not is_active_recipient(session, "+15551230000")
+
+
+def test_add_recipient_rolls_back_and_returns_error_on_database_error() -> None:
+    session = FailingSession()
+
+    assert add_recipient(session, "+15551230000") == AddRecipientResult.ERROR  # type: ignore[arg-type]
+    assert session.rollback_called

@@ -4,3 +4,4 @@ psycopg[binary]>=3.2.1
 pydantic-settings>=2.4.0
 python-multipart>=0.0.9
 sqlmodel>=0.0.22
+twilio>=9.0.0

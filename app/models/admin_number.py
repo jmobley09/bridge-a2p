@@ -5,8 +5,8 @@ from sqlalchemy import Column, DateTime, Text, func
 from sqlmodel import Field, SQLModel
 
 
-class AllowedSender(SQLModel, table=True):
-    __tablename__ = "allowed_senders"
+class AdminNumber(SQLModel, table=True):
+    __tablename__ = "admin_numbers"
 
     id: UUID = Field(default_factory=uuid4, primary_key=True)
     phone_number: str = Field(max_length=32, unique=True, index=True)
