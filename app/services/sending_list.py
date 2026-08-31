@@ -12,8 +12,10 @@ logger = logging.getLogger(__name__)
 
 EMPTY_TWIML = "<Response></Response>"
 ADD_RECIPIENT_PATTERN = re.compile(r"^\s*Add:\s*(?P<phone_number>.+?)\s*$", re.IGNORECASE)
+BROADCAST_PATTERN = re.compile(r"^\s*broadcast:(?P<message>.*)$", re.IGNORECASE | re.DOTALL)
 PHONE_ALLOWED_CHARS_PATTERN = re.compile(r"^[\d\s().+-]+$")
 PHONE_DIGITS_PATTERN = re.compile(r"\D+")
+BROADCAST_FOOTER = "Regards,\nBRIDGE Homeschool Community\n\nReply STOP to opt out."
 JOIN_INSTRUCTIONS_MESSAGE = "Please see a BRIDGE board member for joining this service"
 WELCOME_MESSAGE = "You have been added to the BRIDGE SMS service. Reply STOP to opt out."
 
@@ -74,6 +76,30 @@ def parse_add_recipient_command(body: str) -> str | None:
 
 def is_add_recipient_command(body: str) -> bool:
     return parse_add_recipient_command(body) is not None
+
+
+def parse_broadcast_message(body: str) -> str | None:
+    match = BROADCAST_PATTERN.match(body)
+    if match is None:
+        return None
+
+    message = match.group("message")
+    if message.startswith(" "):
+        return message[1:]
+    return message
+
+
+def build_broadcast_body(message: str) -> str:
+    return f"{message}\n\n{BROADCAST_FOOTER}"
+
+
+def extract_media_urls(payload: dict[str, str]) -> list[str]:
+    media_count = int(payload.get("NumMedia", "0") or 0)
+    return [
+        payload[f"MediaUrl{index}"]
+        for index in range(media_count)
+        if payload.get(f"MediaUrl{index}")
+    ]
 
 
 def add_recipient(session: Session, phone_number: str) -> AddRecipientResult:

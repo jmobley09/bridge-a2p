@@ -125,6 +125,22 @@ If the number is already active, the admin receives `user already has an active 
 number exists but is inactive, the app does not reactivate it or send a welcome message, and the
 admin receives `user exists. please try again with 'activate: <phone number>' to reactivate.`
 
+Admins can broadcast a message to every active sending-list recipient by texting:
+
+```text
+broadcast: Your message here
+```
+
+Everything after `broadcast:` is sent as the message body, preserving line breaks, emoji, and
+attached media. The app appends this footer automatically:
+
+```text
+Regards,
+BRIDGE Homeschool Community
+
+Reply STOP to opt out.
+```
+
 For local Twilio testing, expose the local API with a tunnel such as ngrok and configure your
 Twilio phone number's messaging webhook to:
 

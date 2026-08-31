@@ -11,13 +11,17 @@ from app.services.sending_list import (
     JOIN_INSTRUCTIONS_MESSAGE,
     WELCOME_MESSAGE,
     add_recipient,
+    build_broadcast_body,
     empty_twiml,
+    extract_media_urls,
+    get_active_recipients,
     is_start_opt_in,
     is_stop_opt_out,
     message_twiml,
     opt_in_sender,
     opt_out_sender,
     parse_add_recipient_command,
+    parse_broadcast_message,
 )
 from app.services.twilio_messages import send_sms
 from app.services.twilio_security import is_valid_twilio_signature
@@ -97,6 +101,41 @@ async def receive_inbound_sms(
                 else f"Added {recipient_phone_number}, but the welcome message could not be sent."
             )
 
+        return Response(content=message_twiml(admin_message), media_type="application/xml")
+
+    broadcast_message = parse_broadcast_message(payload.get("Body", ""))
+    if broadcast_message is not None:
+        if not broadcast_message:
+            return Response(
+                content=message_twiml("broadcast message cannot be empty"),
+                media_type="application/xml",
+            )
+
+        broadcast_body = build_broadcast_body(broadcast_message)
+        media_urls = extract_media_urls(payload)
+        recipients = get_active_recipients(session)
+        sent_count = 0
+        failed_count = 0
+
+        for recipient in recipients:
+            sent = send_sms(
+                account_sid=settings.twilio_account_sid,
+                api_key_sid=settings.twilio_api_key_sid,
+                api_key_secret=settings.twilio_api_key_secret,
+                from_number=payload["To"],
+                to_number=recipient.phone_number,
+                body=broadcast_body,
+                media_urls=media_urls,
+            )
+            if sent:
+                sent_count += 1
+            else:
+                failed_count += 1
+
+        admin_message = (
+            f"Broadcast sent to {sent_count} active recipient(s). "
+            f"{failed_count} send(s) failed."
+        )
         return Response(content=message_twiml(admin_message), media_type="application/xml")
 
     save_inbound_message(session, payload)

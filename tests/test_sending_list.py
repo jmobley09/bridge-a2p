@@ -5,9 +5,12 @@ from sqlmodel import Session, SQLModel, create_engine
 from app.models.sending_list_recipient import SendingListRecipient
 from app.services.sending_list import (
     AddRecipientResult,
+    BROADCAST_FOOTER,
     EMPTY_TWIML,
     add_recipient,
+    build_broadcast_body,
     empty_twiml,
+    extract_media_urls,
     get_active_recipients,
     is_active_recipient,
     is_start_message,
@@ -19,6 +22,7 @@ from app.services.sending_list import (
     opt_in_sender,
     opt_out_sender,
     parse_add_recipient_command,
+    parse_broadcast_message,
 )
 
 
@@ -112,6 +116,50 @@ def test_parse_add_recipient_command_rejects_invalid_body() -> None:
     assert parse_add_recipient_command("Add:+15551230000") == "+15551230000"
     assert parse_add_recipient_command("Add: +15551230000 now") is None
     assert parse_add_recipient_command("hello") is None
+
+
+def test_parse_broadcast_message_preserves_body_formatting() -> None:
+    body = "broadcast: Hello families!\n\nPark day at 2pm 🎉\nBring snacks."
+
+    assert parse_broadcast_message(body) == "Hello families!\n\nPark day at 2pm 🎉\nBring snacks."
+
+
+def test_parse_broadcast_message_is_case_insensitive() -> None:
+    assert parse_broadcast_message("Broadcast: Hello") == "Hello"
+    assert parse_broadcast_message("BROADCAST: Hello") == "Hello"
+
+
+def test_parse_broadcast_message_preserves_newline_after_colon() -> None:
+    assert parse_broadcast_message("broadcast:\nLine one\nLine two") == "\nLine one\nLine two"
+
+
+def test_parse_broadcast_message_returns_none_for_other_messages() -> None:
+    assert parse_broadcast_message("hello") is None
+
+
+def test_build_broadcast_body_appends_footer() -> None:
+    message = "Hello families!\nBring snacks."
+
+    assert build_broadcast_body(message) == f"{message}\n\n{BROADCAST_FOOTER}"
+
+
+def test_extract_media_urls_uses_twilio_media_fields() -> None:
+    assert extract_media_urls(
+        {
+            "NumMedia": "2",
+            "MediaUrl0": "https://api.twilio.com/media/one",
+            "MediaUrl1": "https://api.twilio.com/media/two",
+        }
+    ) == [
+        "https://api.twilio.com/media/one",
+        "https://api.twilio.com/media/two",
+    ]
+
+
+def test_extract_media_urls_ignores_missing_media_fields() -> None:
+    assert extract_media_urls({"NumMedia": "2", "MediaUrl0": "https://api.twilio.com/media/one"}) == [
+        "https://api.twilio.com/media/one"
+    ]
 
 
 def test_normalize_us_phone_number() -> None:
