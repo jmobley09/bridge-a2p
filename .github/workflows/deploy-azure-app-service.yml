@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 env:
   AZURE_WEBAPP_PACKAGE_PATH: .
@@ -39,10 +40,16 @@ jobs:
       - name: Run Ruff
         run: ruff check app tests migrations
 
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_8558CBDA57634E9EAA206EE4F2A00CBA }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_BAF54CC70208438982FA7A5FF67F7486 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_0723DCDEE259476EBC809F12F2FBEDE2 }}
+
       - name: Deploy to Azure App Service
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ vars.AZURE_WEBAPP_NAME }}
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
           startup-command: ./startup.sh

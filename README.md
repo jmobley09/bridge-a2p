@@ -194,7 +194,13 @@ GitHub Actions tab.
 Configure these GitHub repository settings:
 
 - Variable: `AZURE_WEBAPP_NAME` = your Azure App Service name
-- Secret: `AZURE_WEBAPP_PUBLISH_PROFILE` = the publish profile XML downloaded from Azure App Service
+- Secret: `AZUREAPPSERVICE_CLIENTID_8558CBDA57634E9EAA206EE4F2A00CBA`
+- Secret: `AZUREAPPSERVICE_TENANTID_BAF54CC70208438982FA7A5FF67F7486`
+- Secret: `AZUREAPPSERVICE_SUBSCRIPTIONID_0723DCDEE259476EBC809F12F2FBEDE2`
+
+These Azure App Service secrets are created automatically when Azure connects the App Service to
+the GitHub repository. The workflow uses OIDC through `azure/login`, so a publish profile is not
+required and basic authentication publishing credentials can stay disabled.
 
 Configure these Azure App Service application settings:
 
