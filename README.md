@@ -205,8 +205,13 @@ required and basic authentication publishing credentials can stay disabled.
 Configure these Azure App Service application settings:
 
 ```env
-DATABASE_URL=postgresql+psycopg://...
 APP_ENV=production
+DB_HOST=bridge-a2p-server.postgres.database.azure.com
+DB_PORT=5432
+DB_NAME=bridge_a2p
+DB_USER=mgbxtxmuhs
+DB_PASSWORD=your_raw_database_password
+DB_SSLMODE=require
 TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 TWILIO_API_KEY_SID=SKxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 TWILIO_API_KEY_SECRET=your_twilio_api_key_secret
@@ -214,6 +219,18 @@ TWILIO_AUTH_TOKEN=your_twilio_auth_token
 TWILIO_VALIDATE_SIGNATURE=true
 PUBLIC_WEBHOOK_BASE_URL=https://sms.bridgehsc.org
 ```
+
+`DB_PASSWORD` should be the raw Azure Postgres password. The app URL-encodes it when building the
+Postgres connection string, so symbols such as `!`, `@`, `#`, `&`, `/`, and `\` do not need manual
+escaping.
+
+For local development, `DATABASE_URL` is still supported and can point at Docker Postgres:
+
+```env
+DATABASE_URL=postgresql+psycopg://bridge:bridge@localhost:5432/bridge_a2p
+```
+
+If `DATABASE_URL` is set, it takes precedence over the separate `DB_*` fields.
 
 The Azure startup script runs migrations before starting the app:
 
