@@ -17,7 +17,7 @@ PHONE_ALLOWED_CHARS_PATTERN = re.compile(r"^[\d\s().+-]+$")
 PHONE_DIGITS_PATTERN = re.compile(r"\D+")
 BROADCAST_FOOTER = "Regards,\nBRIDGE Homeschool Community\n\nReply STOP to opt out."
 JOIN_INSTRUCTIONS_MESSAGE = "Please see a BRIDGE board member for joining this service"
-WELCOME_MESSAGE = "Welcome to the B.R.I.D.G.E Homeschool Community text notifications. You will receive updates regarding the co-op, important information, scheduling, and reminders. Reply STOP to opt out."
+WELCOME_MESSAGE = "Welcome to the B.R.I.D.G.E Homeschool Community text notifications. You will receive updates regarding the co-op, important information, scheduling, and reminders."
 
 
 class AddRecipientResult(StrEnum):
@@ -91,6 +91,9 @@ def parse_broadcast_message(body: str) -> str | None:
 
 def build_broadcast_body(message: str) -> str:
     return f"{message}\n\n{BROADCAST_FOOTER}"
+
+def welcome_message() -> str:
+    return f"{WELCOME_MESSAGE}\n\n{BROADCAST_FOOTER}"
 
 
 def extract_media_urls(payload: dict[str, str]) -> list[str]:
