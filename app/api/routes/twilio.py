@@ -12,6 +12,7 @@ from app.services.sending_list import (
     WELCOME_MESSAGE,
     add_recipient,
     build_broadcast_body,
+    welcome_message,
     empty_twiml,
     extract_media_urls,
     get_active_recipients,
@@ -93,7 +94,7 @@ async def receive_inbound_sms(
                 api_key_secret=settings.twilio_api_key_secret,
                 from_number=payload["To"],
                 to_number=recipient_phone_number,
-                body=WELCOME_MESSAGE,
+                body=welcome_message(),
             )
             admin_message = (
                 f"Added {recipient_phone_number} and sent the welcome message."
