@@ -1,6 +1,4 @@
-import base64
-import hashlib
-import hmac
+from twilio.request_validator import RequestValidator
 
 
 def is_valid_twilio_signature(
@@ -15,7 +13,5 @@ def is_valid_twilio_signature(
     if not signature:
         return False
 
-    signed_data = url + "".join(f"{key}{value}" for key, value in sorted(params.items()))
-    digest = hmac.new(auth_token.encode(), signed_data.encode(), hashlib.sha1).digest()
-    expected = base64.b64encode(digest).decode()
-    return hmac.compare_digest(expected, signature)
+    validator = RequestValidator(auth_token)
+    return validator.validate(url, params, signature)
