@@ -17,7 +17,7 @@ PHONE_ALLOWED_CHARS_PATTERN = re.compile(r"^[\d\s().+-]+$")
 PHONE_DIGITS_PATTERN = re.compile(r"\D+")
 BROADCAST_FOOTER = "Regards,\nBRIDGE Homeschool Community\n\nReply STOP to opt out."
 JOIN_INSTRUCTIONS_MESSAGE = "Please see a BRIDGE board member for joining this service"
-WELCOME_MESSAGE = "Welcome to the B.R.I.D.G.E Homeschool Community text notifications. You will receive updates regarding the co-op, importation information, scheduling, and reminders. Reply STOP to opt out."
+WELCOME_MESSAGE = "Welcome to the B.R.I.D.G.E Homeschool Community text notifications. You will receive updates regarding the co-op, important information, scheduling, and reminders. Reply STOP to opt out."
 
 
 class AddRecipientResult(StrEnum):
