@@ -15,9 +15,9 @@ ADD_RECIPIENT_PATTERN = re.compile(r"^\s*Add:\s*(?P<phone_number>.+?)\s*$", re.I
 BROADCAST_PATTERN = re.compile(r"^\s*broadcast:(?P<message>.*)$", re.IGNORECASE | re.DOTALL)
 PHONE_ALLOWED_CHARS_PATTERN = re.compile(r"^[\d\s().+-]+$")
 PHONE_DIGITS_PATTERN = re.compile(r"\D+")
-BROADCAST_FOOTER = "Thanks,\nBRIDGE Homeschool Community\n\nReply STOP to opt out."
-JOIN_INSTRUCTIONS_MESSAGE = "Please see a BRIDGE board member for joining this service"
-WELCOME_MESSAGE = "Welcome to the B.R.I.D.G.E Homeschool Community text notifications. You will receive updates regarding the co-op, important information, scheduling, and reminders."
+BROADCAST_FOOTER = "Thanks,\nB.R.I.D.G.E. Homeschool Community\n\nReply STOP to opt out."
+JOIN_INSTRUCTIONS_MESSAGE = "Please see a B.R.I.D.G.E. board member for joining this service"
+WELCOME_MESSAGE = "Welcome to the B.R.I.D.G.E. Homeschool Community text notifications. You will receive updates regarding the co-op, important information, scheduling, and reminders."
 
 
 class AddRecipientResult(StrEnum):
