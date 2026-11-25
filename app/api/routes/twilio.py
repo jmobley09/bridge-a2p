@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
 from sqlmodel import Session
 
@@ -24,7 +25,7 @@ from app.services.sending_list import (
     parse_add_recipient_command,
     parse_broadcast_message,
 )
-from app.services.twilio_messages import send_sms
+from app.services.twilio_messages import TwilioCredentials, send_broadcast, send_sms
 from app.services.twilio_security import is_valid_twilio_signature
 
 router = APIRouter(prefix="/webhooks/twilio", tags=["twilio"])
@@ -33,6 +34,7 @@ router = APIRouter(prefix="/webhooks/twilio", tags=["twilio"])
 @router.post("/inbound-sms")
 async def receive_inbound_sms(
     request: Request,
+    background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> Response:
@@ -88,7 +90,8 @@ async def receive_inbound_sms(
         elif result == AddRecipientResult.ERROR:
             admin_message = f"{recipient_phone_number} could not be added. Check application logs."
         else:
-            welcome_sent = send_sms(
+            welcome_sent = await run_in_threadpool(
+                send_sms,
                 account_sid=settings.twilio_account_sid,
                 api_key_sid=settings.twilio_api_key_sid,
                 api_key_secret=settings.twilio_api_key_secret,
@@ -112,30 +115,24 @@ async def receive_inbound_sms(
                 media_type="application/xml",
             )
 
-        broadcast_body = build_broadcast_body(broadcast_message)
-        media_urls = extract_media_urls(payload)
-        recipients = get_active_recipients(session)
-        sent_count = 0
-        failed_count = 0
-
-        for recipient in recipients:
-            sent = send_sms(
+        recipient_numbers = [recipient.phone_number for recipient in get_active_recipients(session)]
+        background_tasks.add_task(
+            send_broadcast,
+            credentials=TwilioCredentials(
                 account_sid=settings.twilio_account_sid,
                 api_key_sid=settings.twilio_api_key_sid,
                 api_key_secret=settings.twilio_api_key_secret,
-                from_number=payload["To"],
-                to_number=recipient.phone_number,
-                body=broadcast_body,
-                media_urls=media_urls,
-            )
-            if sent:
-                sent_count += 1
-            else:
-                failed_count += 1
+            ),
+            from_number=payload["To"],
+            recipient_numbers=recipient_numbers,
+            body=build_broadcast_body(broadcast_message),
+            media_urls=extract_media_urls(payload),
+            admin_number=payload["From"],
+        )
 
         admin_message = (
-            f"Broadcast sent to {sent_count} active recipient(s). "
-            f"{failed_count} send(s) failed."
+            f"Sending broadcast to {len(recipient_numbers)} active recipient(s). "
+            "You'll get a summary text when it finishes."
         )
         return Response(content=message_twiml(admin_message), media_type="application/xml")
 
